@@ -1,0 +1,103 @@
+from qiskit import *        #Libraries need for programming with quantum gates and circuits                         
+from qiskit import IBMQ     #This Library enables communication with real quantum computers                          
+from qiskit.tools.visualization import plot_histogram.  #This is so we can make a visualization of our results later
+import numpy as np          #The rest are math tools
+import itertools            
+import operator
+import numpy
+%matplotlib inline
+
+nQbits = 8;                        #Number of qubit of our circuit
+q      = QuantumRegister(nQbits)   #List of qubits
+c      = ClassicalRegister(nQbits) #List of classical bits 
+qc     = QuantumCircuit(q,c)       #Creation of our circuit
+
+qc.h(range(nQbits)) #Insert a hadamard gate in each qubit to create the superposition 
+
+
+def per_gen(classicalB):
+    aux      = [0, 1, 2, 3]     # All the values we consider to be possible in consolidated binary form
+    list_out = []
+    for i in aux:
+        if i not in classicalB: # Ex: if classicalB=[0,1] and i=2 then we will write a 2 in our list_out
+            list_out.append(i)
+    list_out_2 = list(itertools.permutations(list_out)) # We create the permutations with the filtered numbers
+    print(list_out)
+    return list_out_2
+    
+    def qbit_to_binary(perm):
+    perm_bin = []             #We can dump possible permutations here as a list
+    for item in list(perm):   
+        binary_num = ""
+        for i in item:
+            prm_b = format(i,"b")
+            if len(prm_b)==1:                  # If the length of the binary number is 1 we add a 0 to the left to have a constant length of 2
+                prm_b = '0' + prm_b
+            binary_num = binary_num + prm_b
+        perm_bin.append(binary_num)
+    return perm_bin
+    
+    def oracle(qc, l_qbits, l_perm_bin):
+    for item in l_perm_bin:
+        cont = 0            # Add the necessary X gates at the beginning of the oracle when the value of the char=0
+        for j in item:
+            if j == '0': 
+                qc.x(l_qbits[cont])
+            cont+=1
+        qc.mcrz(-np.pi,l_qbits[1:len(l_qbits)],l_qbits[0])  # Add a Multiple Controlled Z gate
+        cont = 0
+        for j in item:            # Add the necessary X gates at the end of the oracle when the value of the char=0
+            if j == '0':
+                qc.x(l_qbits[cont])
+            cont+=1
+    return qc              
+    
+    def reflector(qc, l_qbits):
+    qc.h(l_qbits)        # Add hadamard gates in each qubit 
+    qc.x(l_qbits)        # Add X gates in each qubit
+    qc.mcrz(-np.pi,l_qbits[1:len(l_qbits)],l_qbits[0]) # Add a Multiple Controlled Z gate
+    qc.x(l_qbits)           # Add X gates in each qubit
+    qc.h(l_qbits)           # Add hadamard gates in each qubit
+    return qc               # Return the given circuit modified
+    
+    def grover(qc,l_qbits, l_bits):    
+    if len(l_qbits) == 2:           # Decides the number of iterations based on the number of qubits
+        n_rep = 1
+    elif len(l_qbits) == 4:
+        n_rep = 1
+    else:
+        n_rep = 2  
+    perm      = per_gen(l_bits)      # Create the permutation for the given bits
+    perm_bin  = qbit_to_binary(perm) # Transform the permutation to its binary values
+    for i in range(n_rep):          # Repeat oracle and reflector n_rep times
+        oracle(qc,l_qbits,perm_bin)
+        reflector(qc,[q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]])
+    if len(l_qbits) == 2:           # Final oracle to correct undesired phase
+        oracle(qc,l_qbits,perm_bin) 
+    return qc                       # Return the given circuit modified
+    print(qc)
+
+#SUDOKU DEFINITION (X : [0,1,2,3]):
+
+#  _______
+#  |X1| 0|
+#  _______
+#  |2 | 1|
+#  _______
+#  |X2| 3|
+#  _____________
+#  |1 |X3| 3|X4|
+#  _____________
+
+grover(qc, [q[0], q[1]], [0, 1, 2])
+grover(qc, [q[0], q[1], q[2], q[3]], [1, 2])
+grover(qc, [q[4], q[5], q[6], q[7]], [1, 3])
+grover(qc, [q[2], q[3], q[4], q[5]], [1, 3])
+
+qc.measure(q, c)
+backend = Aer.get_backend('qasm_simulator')
+result  = execute(qc, backend = backend, shots = 2048*256).result()
+counts  = result.get_counts()
+
+sorted_x = sorted(counts.items(), key=operator.itemgetter(1))
+print(sorted_x[-5:])
